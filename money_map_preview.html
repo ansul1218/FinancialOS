@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Money Map Prototype</title>
+    <style>
+        body { background-color: #121212; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+        canvas { background-color: #1E1E1E; border-radius: 16px; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; background: #2962FF; color: white; border: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Money Map Logic Test</h1>
+    <p>Visualizing flow: Source (Green) -> Hub (Blue) -> Sinks (Orange)</p>
+    <canvas id="moneyMap" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <button onclick="animateFlow()">Simulate Transfer</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('moneyMap');
+        const ctx = canvas.getContext('2d');
+
+        const nodes = [
+            { id: 'sbi', name: 'SBI Salary', type: 'SOURCE', x: 100, y: 300, color: '#00C853' },
+            { id: 'pnb', name: 'PNB Spending', type: 'HUB', x: 400, y: 300, color: '#2962FF' },
+            { id: 'groww', name: 'Groww Stocks', type: 'SINK', x: 700, y: 150, color: '#FF6D00' },
+            { id: 'posb', name: 'POSB Savings', type: 'SINK', x: 700, y: 300, color: '#FF6D00' },
+            { id: 'ippb', name: 'IPPB RD', type: 'SINK', x: 700, y: 450, color: '#FF6D00' }
+        ];
+
+        function drawBezier(start, end, width, color) {
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            const cp1 = { x: start.x + (end.x - start.x) / 2, y: start.y };
+            const cp2 = { x: start.x + (end.x - start.x) / 2, y: end.y };
+            ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+            ctx.lineWidth = width;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Edges (Static)
+            const hub = nodes.find(n => n.id === 'pnb');
+            
+            // Source -> Hub
+            nodes.filter(n => n.type === 'SOURCE').forEach(source => {
+                drawBezier(source, hub, 8, 'rgba(255, 255, 255, 0.2)');
+            });
+
+            // Hub -> Sinks
+            nodes.filter(n => n.type === 'SINK').forEach(sink => {
+                drawBezier(hub, sink, 4, 'rgba(255, 255, 255, 0.2)');
+            });
+
+            // Draw Nodes
+            nodes.forEach(node => {
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 25, 0, Math.PI * 2);
+                ctx.fillStyle = node.color;
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(node.name, node.x, node.y + 45);
+            });
+        }
+
+        let particles = [];
+        
+        function animateFlow() {
+            // Spawn particles
+            const hub = nodes.find(n => n.id === 'pnb');
+            
+            // Particles from Source to Hub
+            nodes.filter(n => n.type === 'SOURCE').forEach(source => {
+                particles.push({ 
+                    start: source, end: hub, progress: 0, speed: 0.02, color: '#69F0AE' 
+                });
+            });
+
+            // Particles from Hub to Sinks (delayed)
+            setTimeout(() => {
+                nodes.filter(n => n.type === 'SINK').forEach(sink => {
+                    particles.push({ 
+                        start: hub, end: sink, progress: 0, speed: 0.02, color: '#40C4FF' 
+                    });
+                });
+            }, 1000);
+            
+            if (!isAnimating) {
+                isAnimating = true;
+                requestAnimationFrame(loop);
+            }
+        }
+
+        let isAnimating = false;
+        function loop() {
+            draw();
+            
+            // Update and Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.progress += p.speed;
+                
+                // Calculate position on bezier
+                const t = p.progress;
+                const start = p.start;
+                const end = p.end;
+                const cp1 = { x: start.x + (end.x - start.x) / 2, y: start.y };
+                const cp2 = { x: start.x + (end.x - start.x) / 2, y: end.y };
+                
+                // Cubic Bezier formula
+                const x = Math.pow(1-t,3)*start.x + 3*Math.pow(1-t,2)*t*cp1.x + 3*(1-t)*Math.pow(t,2)*cp2.x + Math.pow(t,3)*end.x;
+                const y = Math.pow(1-t,3)*start.y + 3*Math.pow(1-t,2)*t*cp1.y + 3*(1-t)*Math.pow(t,2)*cp2.y + Math.pow(t,3)*end.y;
+
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                if (p.progress >= 1) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            if (particles.length > 0) {
+                requestAnimationFrame(loop);
+            } else {
+                isAnimating = false;
+                draw(); // Final redraw
+            }
+        }
+
+        draw();
+    </script>
+</body>
+</html>
